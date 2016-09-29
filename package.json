@@ -1,0 +1,14 @@
+{
+  "name": "bookmarkmp3",
+  "version": "0.0.1",
+  "description": "HTML5 Audio player that allows dynamically adding cues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lineophile/bookmarkmp3.git"
+  },
+  "author": "Kevin Phuoc Nguyen",
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "gulp-connect": "^5.0.0"
+  }
+}
