@@ -71,21 +71,26 @@ function renderItems(items) {
             var a = document.createElement('a');
             a.href = linkData.link;
             a.text = linkData.metadata.name;
-
+            
+            //had to use full names because relative paths turn into absolute paths for track.src 
             if (counter % 2 === 0) {
-                a.dataset.bookmarks = 'track.vtt';
+                a.dataset.bookmarks = 'http://localhost:9002/track.vtt';
             } else {
-                a.dataset.bookmarks = 'track.1.vtt';
+                a.dataset.bookmarks = 'http://localhost:9002/track.1.vtt';
             } counter++;
             
             a.addEventListener('click', function(e) {
                 e.preventDefault();     
-                output.innerHTML = '';  
-                track.src = ''; //gets rid of references to old cues   
-                audio.src = '';      
-                audio.src = this.href;
-                track.src = this.dataset.bookmarks;
-                audio.play();
+                
+                //hack to avoid cues not being loaded when track being replaced is same track
+                if (track.src !== this.dataset.bookmarks) {
+                    output.innerHTML = '';  
+                    track.src = ''; //gets rid of references to old cues   
+                    audio.src = '';      
+                    audio.src = this.href;
+                    track.src = this.dataset.bookmarks;
+                    audio.play();
+                }
             });
 
             li.appendChild(a);

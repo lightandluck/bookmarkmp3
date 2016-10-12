@@ -20,9 +20,8 @@
         <main>
             <section id="player">
                 <h2>Player</h2>
-                <audio src="" controls id="audio">
-                    <track id="bookmark-track" label="Bookmark file" kind="metadata" src="" default>
-                </audio>
+                <!-- Add scrubber, it doesn't appear in Safari -->
+                <audio src="" controls id="audio"><track id="bookmark-track" label="Bookmark file" kind="metadata" src="" default></audio>
             </section>
 
             <section id="files">
@@ -39,6 +38,7 @@
                 </div>
             </section>
             
+            <!-- Cues do not work in firefox -->
             <section id="cues">
 
             </section>
