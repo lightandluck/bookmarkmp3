@@ -8,6 +8,7 @@ function getAccessTokenFromUrl() {
 // If the user was just redirected from authenticating, the urls hash will
 // contain the access token.
 function isAuthenticated() {
+    //TODO: use dropbox api to check if user is logged in without url hash
     return !!getAccessTokenFromUrl();
 }
 
@@ -24,6 +25,29 @@ function sortByName(a, b) {
     return 0;
 }
 
+var audio = document.getElementById('audio'),
+        track = document.getElementById('bookmark-track'),
+        output = document.getElementById('cues'),
+        source = document.getElementById('source'),
+        counter = 0;
+
+track.addEventListener('load', function() {
+    output.innerHTML = '';
+    var c = audio.textTracks[0].cues;
+    for (var i=0; i<c.length; i++) {
+        var s = document.createElement("p");
+        s.innerHTML = c[i].text;
+        s.dataset.start = c[i].startTime;
+        s.addEventListener("click",seek);
+        output.appendChild(s);
+    }
+});
+
+function seek(e) {
+    audio.currentTime = this.dataset.start;
+    if(audio.paused){ audio.play(); }
+};
+
 // Render a list of items to #files
 function renderItems(items) {
     var filesContainer = document.getElementById('filelist');
@@ -35,6 +59,8 @@ function renderItems(items) {
     items.forEach(function (item) {
         //TODO: Add check for music files and check for commas
         var track = item.name;
+
+        /* push promises of urls into Array */
         if (track.match(/\.(mp3|ogg|m4a)$/i)) {
             makeUrls.push(getUrlData(album,track));
         }
@@ -42,46 +68,26 @@ function renderItems(items) {
     });
 
     //TODO: definitely needs some re-factoring
+    /* Loops over array of promises  */
     Promise.all(makeUrls).then(function (p) {
-        var audio = document.getElementById('audio'),
-            track = document.getElementById('bookmark-track'),
-            output = document.getElementById('cues'),
-            source = document.getElementById('source'),
-            counter = 0;
-
-        track.addEventListener('load', function() {
-            output.innerHTML = '';
-            var c = audio.textTracks[0].cues;
-            for (var i=0; i<c.length; i++) {
-                var s = document.createElement("p");
-                s.innerHTML = c[i].text;
-                s.dataset.start = c[i].startTime;
-                s.addEventListener("click",seek);
-                output.appendChild(s);
-            }
-        });
-
-        function seek(e) {
-          audio.currentTime = this.dataset.start;
-          if(audio.paused){ audio.play(); }
-        };
-
         p.forEach(function (linkData) {
             var li = document.createElement('li');
             var a = document.createElement('a');
             a.href = linkData.link;
             a.text = linkData.metadata.name;
             
-            //had to use full names because relative paths turn into absolute paths for track.src 
-            if (counter % 2 === 0) {
-                a.dataset.bookmarks = 'http://localhost:9002/track.vtt';
-            } else {
-                a.dataset.bookmarks = 'http://localhost:9002/track.1.vtt';
-            } counter++;
-            
+            var vttlink = dbx.filesGetTemporaryLink({
+                path: linkData.metadata.path_display.replace(/\.(mp3|ogg|m4a)$/i, ".vtt")
+            });
+
+            vttlink.then( vttlinkData => {
+                if (!vttlinkData.error) {
+                    a.dataset.bookmarks = vttlinkData.link;
+                }
+            });
+
             a.addEventListener('click', function(e) {
                 e.preventDefault();     
-                
                 //hack to avoid cues not being loaded when track being replaced is same track
                 if (track.src !== this.dataset.bookmarks) {
                     output.innerHTML = '';  
@@ -89,6 +95,7 @@ function renderItems(items) {
                     audio.src = '';      
                     audio.src = this.href;
                     track.src = this.dataset.bookmarks;
+                    audio.load();
                     audio.play();
                 }
             });
@@ -100,7 +107,20 @@ function renderItems(items) {
     });
 }
 
-var getUrlData = function (album, name) {
+//converts cues with non-enumerable properties into JSON to be saved
+function cuesToJSON(cues) {
+    return JSON.stringify(Array.from(cues)
+        .map( obj => {
+            return {
+                text: obj.text,
+                startTime: obj.startTime,
+                endTime: obj.endTime
+            }
+        })
+    );
+}
+
+function getUrlData(album, name) {
     var path;
     path = album + '/' + name;
     var pathObj = { path: path };
@@ -129,8 +149,6 @@ if (isAuthenticated()) {
             console.error(error);
         });
     
-    
-
 } else {
     showPageSection('pre-auth-section');
 
