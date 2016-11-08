@@ -95,8 +95,10 @@ function renderItems(items) {
                     audio.src = '';      
                     audio.src = this.href;
                     track.src = this.dataset.bookmarks;
+                    track.dataset.trackname = linkData.metadata.name;
                     audio.load();
                     audio.play();
+                    texttrack = audio.textTracks[0];
                 }
             });
 
@@ -118,6 +120,40 @@ function cuesToJSON(cues) {
             }
         })
     );
+}
+
+function cuesToWebVTT(cues) {
+    var arr = Array.from(cues);
+    var str = "WEBVTT\n\n";
+
+    arr.forEach(function(cue) {
+        var text = secondsToHms(cue.startTime) + ' --> ' + secondsToHms(cue.endTime) +
+            '\n' + cue.text + '\n\n';
+
+        str += text; 
+    })
+
+    return str.trim();
+}
+
+function secondsToHms(d) {
+    d = Number(d);
+    var h = Math.floor(d / 3600);
+    var m = Math.floor(d % 3600 / 60);
+    var s = Math.floor(d % 3600 % 60);
+    var re = /\.\d*/.exec(d);
+    var mi;
+    if (re) {
+        mi = re[0]
+    } else {
+        mi = '.000'
+    }
+
+    return pad(h) + ':' + pad(m) + ':' + pad(s) + mi;
+}
+
+function pad(n) {
+    return n < 10 ? "0" + n : n.toString()
 }
 
 function getUrlData(album, name) {
