@@ -1,5 +1,58 @@
 var CLIENT_ID = '47ekkmluwwcvrqj';
 
+var audio = document.getElementById('audio'),
+        track = document.getElementById('bookmark-track'),
+        output = document.getElementById('cues'),
+        source = document.getElementById('source'),
+        btnAddCue = document.getElementById('btn-add-cue'),
+        cueText = document.getElementById('cue-text'),
+        textTrack,
+        counter = 0;
+
+track.addEventListener('load', showCues);
+
+function showCues() {
+    output.innerHTML = '';
+    var c = audio.textTracks[0].cues;
+    for (var i=0; i<c.length; i++) {
+        var s = document.createElement("p");
+        s.innerHTML = c[i].text;
+        s.dataset.start = c[i].startTime;
+        s.addEventListener("click",seek);
+        output.appendChild(s);
+    }
+}
+
+if (isAuthenticated()) {
+    showPageSection('authed-section');
+
+    // Create an instance of Dropbox with the access token and use it to
+    // fetch and render the files in the users root directory.
+    var dbx = new Dropbox({ accessToken: getAccessTokenFromUrl() });
+
+    //TODO: robust file retrieval and traversal
+    dbx.filesListFolder({ path: '/Bucky' })
+        .then(function (response) {
+            renderItems(response.entries);
+        })
+        .catch(function (error) {
+            console.error(error);
+        });
+    
+} else {
+    showPageSection('pre-auth-section');
+
+    // Set the login anchors href using dbx.getAuthenticationUrl()
+    //TODO: place dbx in closure, so that it is not available from console
+    //TODO: place auth token in local storage so it can be used when not in url
+    var dbx = new Dropbox({ clientId: CLIENT_ID });
+    var authUrl = dbx.getAuthenticationUrl('http://localhost:9002/');
+
+    //TODO: move auth to sign link
+    document.getElementById('authlink').href = authUrl;
+}
+
+
 // Parses the url and gets the access token if it is in the urls hash
 function getAccessTokenFromUrl() {
     return utils.parseQueryString(window.location.hash).access_token;
@@ -25,24 +78,6 @@ function sortByName(a, b) {
     return 0;
 }
 
-var audio = document.getElementById('audio'),
-        track = document.getElementById('bookmark-track'),
-        output = document.getElementById('cues'),
-        source = document.getElementById('source'),
-        counter = 0;
-
-track.addEventListener('load', function() {
-    output.innerHTML = '';
-    var c = audio.textTracks[0].cues;
-    for (var i=0; i<c.length; i++) {
-        var s = document.createElement("p");
-        s.innerHTML = c[i].text;
-        s.dataset.start = c[i].startTime;
-        s.addEventListener("click",seek);
-        output.appendChild(s);
-    }
-});
-
 function seek(e) {
     audio.currentTime = this.dataset.start;
     if(audio.paused){ audio.play(); }
@@ -57,7 +92,7 @@ function renderItems(items) {
         makeUrls = [];
     items.sort(sortByName);
     items.forEach(function (item) {
-        //TODO: Add check for music files and check for commas
+        //TODO: Add check for music files and check for commas in names which need to be escaped somehow to be found properly
         var track = item.name;
 
         /* push promises of urls into Array */
@@ -90,6 +125,7 @@ function renderItems(items) {
                 e.preventDefault();     
                 //hack to avoid cues not being loaded when track being replaced is same track
                 if (track.src !== this.dataset.bookmarks) {
+                    btnAddCue.removeEventListener('click', addCue, false);
                     output.innerHTML = '';  
                     track.src = ''; //gets rid of references to old cues   
                     audio.src = '';      
@@ -98,7 +134,8 @@ function renderItems(items) {
                     track.dataset.trackname = linkData.metadata.name;
                     audio.load();
                     audio.play();
-                    texttrack = audio.textTracks[0];
+                    textTrack = audio.textTracks[0];
+                    btnAddCue.addEventListener('click', addCue, false);
                 }
             });
 
@@ -107,6 +144,14 @@ function renderItems(items) {
         })
 
     });
+}
+
+function addCue() {
+    textTrack.addCue(new VTTCue(audio.currentTime, audio.currentTime + 5, cueText.value));
+    console.log('Added cue');
+    //TODO: add logic to check if sync is necessary, make sure we don't overwrite files in error
+    dbx.filesAlphaUpload(cuesToWebVTT(textTrack.cues));
+    showCues();
 }
 
 //converts cues with non-enumerable properties into JSON to be saved
@@ -131,9 +176,14 @@ function cuesToWebVTT(cues) {
             '\n' + cue.text + '\n\n';
 
         str += text; 
-    })
+    });
 
-    return str.trim();
+    return {
+        contents: new Blob([str.trim()], { type: 'text/plain' }),
+        path: '/Bucky/01 (entire) -  January 20.vtt',
+        mode: { '.tag': 'overwrite' },
+        mute: true
+    }
 }
 
 function secondsToHms(d) {
@@ -141,7 +191,8 @@ function secondsToHms(d) {
     var h = Math.floor(d / 3600);
     var m = Math.floor(d % 3600 / 60);
     var s = Math.floor(d % 3600 % 60);
-    var re = /\.\d*/.exec(d);
+    //look for first 3 digits of milliseconds
+    var re = /\.\d{1,3}/.exec(d);
     var mi;
     if (re) {
         mi = re[0]
@@ -169,29 +220,3 @@ function showPageSection(elementId) {
     document.getElementById(elementId).style.display = 'block';
 }
 
-if (isAuthenticated()) {
-    showPageSection('authed-section');
-
-    // Create an instance of Dropbox with the access token and use it to
-    // fetch and render the files in the users root directory.
-    var dbx = new Dropbox({ accessToken: getAccessTokenFromUrl() });
-
-    //TODO: robust file retrieval and traversal
-    dbx.filesListFolder({ path: '/Bucky' })
-        .then(function (response) {
-            renderItems(response.entries);
-        })
-        .catch(function (error) {
-            console.error(error);
-        });
-    
-} else {
-    showPageSection('pre-auth-section');
-
-    // Set the login anchors href using dbx.getAuthenticationUrl()
-    var dbx = new Dropbox({ clientId: CLIENT_ID });
-    var authUrl = dbx.getAuthenticationUrl('http://localhost:9002/');
-
-    //TODO: move auth to sign link
-    document.getElementById('authlink').href = authUrl;
-}
