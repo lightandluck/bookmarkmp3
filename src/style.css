@@ -1,7 +1,9 @@
-#filelist {
+#files {
     float: left;
+    width: 50%;
 }
 
 #cues {
     float: right;
+    width: 50%;
 }

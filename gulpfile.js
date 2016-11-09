@@ -19,8 +19,6 @@ gulp.task('css', _ => {
         .pipe(connect.reload());
 });
 
-
-
 gulp.task('webserver', _ => {
     connect.server({
         root: 'public',
